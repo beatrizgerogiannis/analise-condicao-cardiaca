@@ -1,50 +1,60 @@
-# Triagem de Cardiopatia Infantil (UCMF) — Pipeline de Limpeza e Modelagem
+# Triagem de Cardiopatia Infantil (UCMF) — Pipeline de Limpeza e Modelagem 
 
-Pipeline em Python para limpar os dados brutos da UCMF (fichas de triagem
-cardiológica infantil) e comparar, via validação cruzada + holdout, quatro
-cenários de modelagem que simulam diferentes níveis de informação clínica
-disponível no momento da triagem.
+Este é um projeto de **Mineração de Dados (Data Mining)** baseado na metodologia **KDD (Knowledge Discovery in Databases)**. O objetivo é extrair padrões ocultos e informações úteis de uma base de dados reais de fichas de triagem cardiológica infantil da UCMF, simulando diferentes níveis de infraestrutura médica através de 4 cenários de modelagem.
 
-## O que o script faz
+---
 
-1. Carrega e limpa o CSV bruto (`carregar_e_limpar_dados`, `tratar_datas_e_idade`,
-   `aplicar_limites_clinicos`): padroniza texto, corrige datas com erro de século,
-   recupera datas em formato serial do Excel, converte faixas de FC em média,
-   trata sentinelas de "não medido", remove duplicatas e calcula o IMC.
-2. Separa um holdout estratificado (20%) **antes** de qualquer validação cruzada,
-   para que a estimativa final de desempenho não seja otimista.
-3. Treina e compara 5 modelos (Regressão Logística, SVC, Random Forest,
-   Gradient Boosting, XGBoost) em 4 cenários de variáveis disponíveis:
+## 🔄 O que foi feito (Metodologia KDD)
 
-   | Cenário | Variáveis removidas | O que simula |
-   |---|---|---|
-   | A | nenhuma | modelo completo, com exame clínico |
-   | B | SOPRO, PULSOS, B2, PPA | triagem sem exame físico especializado |
-   | C | + MOTIVO1, MOTIVO2 | triagem sem motivo de encaminhamento |
-   | D | + HDA 1, HDA2 | triagem sem nenhuma impressão clínica prévia |
+O desenvolvimento do pipeline seguiu rigorosamente as etapas do processo KDD para transformar dados brutos em conhecimento acionável:
 
-4. Compara estatisticamente os cenários (teste t pareado no ROC-AUC fold a fold).
-5. Calcula importância de variáveis por permutação no holdout (Random Forest)
-   e gera um gráfico comparativo (`comparacao_importancias.png`).
-6. Roda uma checagem exploratória adicional de holdout temporal (treino nos
-   anos mais antigos, teste no ano mais recente), só para sinalizar possível
-   drift de protocolo ao longo do tempo.
+### 1. Exploracão e Filtragem Inicial 🔎
+Antes de qualquer alteração, foi feita uma análise exploratória completa do dataset original **sem remover nenhum dado**. O objetivo foi mapear o estado real da base, identificando:
+* Tipos de sujeira e preenchimentos incorretos.
+* Linhas com ausência crítica de informações.
+* Recursos (*features*) irrelevantes para o problema clínico ou puramente administrativas.
 
-Para a lógica de cada etapa, decisões de limpeza e justificativas, veja
-[`DOCUMENTACAO.md`](./DOCUMENTACAO.md).
+### 2. Limpeza e Padronização de Dados 🧹
+Após o diagnóstico da base, aplicamos técnicas de engenharia de dados para garantir a consistência dos modelos:
+* **Remoção de duplicatas:** Eliminadas logo no início para evitar vazamento de dados (*data leakage*) entre treino e validação.
+* **Tratamento de valores impossíveis:** Filtragem de limites clínicos (ex: idades negativas ou >19 anos, batimentos cardíacos incompatíveis com a vida).
+* **Padronização de textos:** Unificação de grafias variadas para o mesmo diagnóstico (ex: "sistólico" vs "Sistólico").
+* **Correção de datas:** Recuperação de anos corrompidos (erros de século no Excel) e cálculo automático da idade real.
 
-## Requisitos
+### 3. Cenários de Modelagem e a "Feature de Ouro" 🟡
+Para avaliar o impacto real dos dados clínicos e forçar os modelos utilizados (Regressão Logística, SVC, Random Forest, Gradient Boosting, XGBoost) a encontrarem padrões mesmo na ausência de exames complexos, dividimos a análise em **4 cenários progressivos**. Isso nos permitiu testar a robustez dos algoritmos retirando gradativamente as informações, incluindo a **"feature de ouro"** (os achados do exame físico especializado do cardiologista, como Sopro e Pulsos):
 
-- Python 3.9+
-- pandas, numpy, scipy, matplotlib
-- scikit-learn
-- xgboost
+| Cenário | Variáveis Removidas | O que simula na prática? |
+| :--- | :--- | :--- |
+| **Cenário A** | Nenhuma | **Modelo Completo:** Infraestrutura ideal com exame clínico especializado disponível. |
+| **Cenário B** | SOPRO, PULSOS, B2, PPA | **Sem Exame Físico (Feature de Ouro):** Triagem em locais sem cardiologista ou estetoscópio avançado. |
+| **Cenário C** | + MOTIVO1, MOTIVO2 | **Sem Encaminhamento:** Triagem puramente baseada em dados vitais e demográficos básicos. |
+| **Cenário D** | + HDA 1, HDA2 | **Zero Impressão Clínica:** O cenário mais estrito; avalia se há sinal preditivo apenas em dados brutos de triagem. |
 
-Instalação:
+---
+
+## 🩺 Como o resultado auxilia na prática?
+
+O resultado dessa mineração de dados traz respostas de alto valor para a gestão de saúde pública e triagem clínica:
+
+* **Medição do impacto da ausência do especialista:** Mostra matematicamente o quanto de acurácia (ROC-AUC/Recall) se perde quando o paciente não passa por uma ausculta especializada (Cenário B).
+* **Identificação de padrões alternativos:** Força o modelo a descobrir relações ocultas entre sinais vitais básicos (Peso, Altura, IMC, Pressão Arterial e Frequência Cardíaca) para prever anormalidades cardíacas.
+* **Otimização de recursos:** Ajuda a definir se um protocolo de triagem simplificado (Cenário C ou D) é viável e seguro para rodar em postos de saúde periféricos ou telemedicina, direcionando casos graves de forma eficiente mesmo sem um especialista na ponta.
+
+---
+
+## 🛠️ Requisitos e Instalação
+
+* Python 3.9+
+* Pandas, NumPy, SciPy, Matplotlib, Scikit-Learn, XGBoost
+* Instalação:
 
 ```bash
 pip install pandas numpy scipy matplotlib scikit-learn xgboost
 ```
+
+Para a lógica de cada etapa, decisões de limpeza e justificativas, veja
+[`DOCUMENTACAO.md`](./DOCUMENTACAO.md).
 
 ## Dados esperados
 
@@ -82,7 +92,7 @@ Os parâmetros mais relevantes estão no topo do arquivo:
 Aumentar `N_REPEATS` torna o teste estatístico entre cenários mais robusto,
 ao custo de mais tempo de execução.
 
-## Limitações conhecidas
+## Limitações conhecidas ❗
 
 - O dataset cobre vários anos e parece ter mudado de protocolo ao longo do
   tempo (ex.: diferenciação de PPA "Não Calculado"); o split aleatório usado
